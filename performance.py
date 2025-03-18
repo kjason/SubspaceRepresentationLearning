@@ -20,7 +20,7 @@ from predict import Predictor
 
 def get_name(s: str):
     patterns = [r'/([^;]*)_t=',r't=([^;]*)_v=',r'loss=([^;]*)_mu=',r'mu=([^;]*)_mo=',
-                r'mo=([^;]*)_bs=',r'bs=([^;]*)_epoch=',r'wd=([^;]*)_seed=',r'spr=([^;]*)_dg=',r'sep=([^;]*)_rho=',r'nsrc=([^;]*)_T=',r'T=([^;]*)_rg=',
+                r'mo=([^;]*)_bs=',r'bs=([^;]*)_epoch=',r'epoch=([^;]*)_wd',r'wd=([^;]*)_seed=',r'spr=([^;]*)_dg=',r'sep=([^;]*)_rho=',r'nsrc=([^;]*)_T=',r'T=([^;]*)_rg=',
                 r'rg=([^;]*)_sep=',r'rho=([^;]*)_mix=',r'mix=([^;]*)_snr=',r'snr=([^;]*)_uni=',r'uni=([^;]*)_spr=',r'dg=([^;]*)_uv=',
                 r'uv=([^;]*)_crs=',r'crs=([^;]*)_dy=',r'rp=([^;]*)_pr=',r'_pr=([^;]*)_tpo=',r'tpo=([^;]*)_nor=',r'nor=([^;]*)_oc=']
     name = ""
@@ -28,7 +28,7 @@ def get_name(s: str):
         x = re.findall(i,s)
         if len(x) != 0:
             name += x[0]
-    name = name.replace('./','').replace('/','_').replace('.','_').replace(',','').replace('[','').replace(']','')
+    name = name.replace('./','').replace('/','_').replace('.','_').replace(',','').replace('[','').replace(']','').replace('-','')
     return name
 
 def display_evaluation_status(N_sensors: int, num_sources: int, T_snapshots: int, SNR: float, crb: float, trials: int, mse: np.ndarray, bias: np.ndarray, success: np.ndarray, num_random_thetas: int, j: int, i: int, k: int, rho: float):
@@ -57,6 +57,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_sources_list', default=[1,2,3,4,5,6,7,8,9], nargs='+', type=int, help='Number of sources for evaluation')
     parser.add_argument('--provide_noise_var', default=1, type=int, help='1 or 0. (1): provide the ground truth noise variance, (0): not provide the noise variance')
     parser.add_argument('--random_power', default=0, type=int, help='1 or 0. (1): random source power, (0): equal source power')
+    parser.add_argument('--power_range', default=[0.1,1.0], nargs='+', type=float, help='range of the random power')
     parser.add_argument('--total_power_one', default=0, type=int, help='1 or 0. (1): normalize the power of sources such that the total source power is one, (0): no normalization')
     parser.add_argument('--evenly_distributed', default=0, type=int, help='1 or 0. (1): source angles are evenly distributed, (0): randomly distributed')
     parser.add_argument('--return_snapshots', default=0, type=int, help='1 or 0. (1): return snapshots as input, (0): return covariance matrices as input')
@@ -96,6 +97,7 @@ if __name__ == '__main__':
     # use 8,8,8,8,10,11,11,12,13 if meaningful CRBs are needed (the minimum separations need to be sufficiently large)
     provide_noise_var = bool(args.provide_noise_var)
     random_power = bool(args.random_power)
+    power_range = args.power_range
     total_power_one = bool(args.total_power_one)
     evenly_distributed = bool(args.evenly_distributed)
     return_snapshots = bool(args.return_snapshots)
@@ -229,7 +231,7 @@ if __name__ == '__main__':
                     # create or load a dataset
                     eval_dataset = Cov2DoADataset(mode='eval',d=d,lam=lam,N_sensors=N_sensors,T_snapshots=T_snapshots_list[j],num_sources=num_sources_list[i],snr_range=[SNR_list[k],SNR_list[k]],
                                                   seed=seed,deg_range=deg_range,min_sep=min_sep[i],L=num_random_thetas,base_L=trials_per_theta,gain_bias=gain_bias,phase_bias_deg=phase_bias_deg,
-                                                  position_bias=position_bias,mc_mag_angle=mc_mag_angle,rho=rho,mix_rho=False,provide_noise_var=provide_noise_var,random_power=random_power,
+                                                  position_bias=position_bias,mc_mag_angle=mc_mag_angle,rho=rho,mix_rho=False,provide_noise_var=provide_noise_var,random_power=random_power,power_range=power_range,
                                                   total_power_one=total_power_one,evenly_distributed=evenly_distributed,return_snapshots=return_snapshots,device='cpu',save_dataset=save_dataset)
                     dataloader = torch.utils.data.DataLoader(eval_dataset,batch_size=batch_size,shuffle=False,num_workers=0,pin_memory=True,drop_last=False)
 

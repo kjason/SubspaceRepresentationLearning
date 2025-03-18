@@ -38,32 +38,174 @@ def FrobeniusNorm(outputs, targets, source_numbers, angles):
     A = outputs - targets
     return torch.linalg.matrix_norm(A,'fro')
 
-# subspace representation learning
+# subspace representation learning | Geodesic distance
 def NoiseSubspaceDist(outputs, targets, source_numbers, angles):
-    rank = source_numbers[0]
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
     m = targets.size(-1) - rank
     _, AQ = torch.linalg.eigh(outputs)
     _, BQ = torch.linalg.eigh(targets)
     A = AQ[:,:,-m:]
     B = BQ[:,:,:-rank]
-    _, S, _= torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
     theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
     return torch.sqrt(torch.sum(theta[:,:m] ** 2, dim=1))
 
-# the main loss function of the subspace representation learning approach, see Section IV in the paper
+# the main loss function of the subspace representation learning approach | Geodesic distance | see Section IV in the paper
 def SignalSubspaceDist(outputs, targets, source_numbers, angles):
-    rank = source_numbers[0]
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
     _, AQ = torch.linalg.eigh(outputs)
     _, BQ = torch.linalg.eigh(targets)
     A = AQ[:,:,-rank:]
     B = BQ[:,:,-rank:]
-    _, S, _= torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
     theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
     return torch.sqrt(torch.sum(theta[:,:rank] ** 2, dim=1))
 
+# subspace representation learning | Geodesic distance | without consistent rank sampling | direct approach
+def SignalSubspaceDistNoCrsDirect(outputs, targets, source_numbers, angles):
+    batch_size = outputs.size(0)
+    l = []
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    for i in range(batch_size):
+        rank = source_numbers[i]
+        A = AQ[:,:,-rank:]
+        B = BQ[:,:,-rank:]
+        _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+        theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+        l.append(torch.sqrt(torch.sum(theta[:,:rank] ** 2, dim=1)))
+    return torch.cat(l,dim=0)
+
+# subspace representation learning | Geodesic distance | without consistent rank sampling | grouping approach
+def SignalSubspaceDistNoCrsGroup(outputs, targets, source_numbers, angles):
+    max_n_src = max(source_numbers).item()
+    l = []
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    for i in range(1,max_n_src+1):
+        x = source_numbers == i
+        if not True in x:
+            continue
+        rank = source_numbers[x][0]
+        A = AQ[x,:,-rank:]
+        B = BQ[x,:,-rank:]
+        _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+        theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+        l.extend(torch.sqrt(torch.sum(theta[:,:rank] ** 2, dim=1)))
+    l = [j.reshape(1) for j in l]
+    return torch.cat(l,dim=0)
+
+# subspace representation learning | Chordal distance (or projection Frobenius norm distance) using principal angles
+def SignalChordalDistPA(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+    return torch.sqrt(torch.sum(torch.sin(theta[:,:rank]) ** 2, dim=1))
+
+# subspace representation learning | Chordal distance (or projection Frobenius norm distance) using orthonormal bases
+def SignalChordalDistOB(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    C = A @ A.conj().transpose(-2,-1) - B @ B.conj().transpose(-2,-1)
+    return torch.linalg.matrix_norm(C,'fro') / torch.sqrt(torch.tensor(2))
+
+# subspace representation learning | Projection 2-norm using principal angles
+def SignalProjectionDistPA(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+    return torch.sin(theta[:,rank-1])
+
+# subspace representation learning | Projection 2-norm using orthonormal bases
+def SignalProjectionDistOB(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    C = A @ A.conj().transpose(-2,-1) - B @ B.conj().transpose(-2,-1)
+    return torch.linalg.matrix_norm(C,2)
+
+# subspace representation learning | Fubini-Study distance using principal angles
+def SignalFubiniStudyDistPA(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    C = torch.prod(S[:,:rank],dim=1)
+    return torch.acos(-torch.nn.functional.threshold(-C,-1,-1))
+
+# subspace representation learning | Fubini-Study distance using orthonormal bases
+def SignalFubiniStudyDistOB(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    C = A.conj().transpose(-2,-1) @ B
+    D = torch.abs(torch.linalg.det(C))
+    return torch.acos(-torch.nn.functional.threshold(-D,-1,-1))
+
+# subspace representation learning | Procrustes distance (or chordal Frobenius norm distance) using principal angles
+def SignalProcrustesDistPA(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+    return 2 * torch.sqrt(torch.sum(torch.sin(theta[:,:rank] / 2) ** 2, dim=1))
+
+# subspace representation learning | Procrustes distance (or chordal Frobenius norm distance) using orthonormal bases
+# def SignalProcrustesDistOB(outputs, targets, source_numbers, angles):
+#     rank = source_numbers[0] # assume consistent rank sampling is enabled
+#     _, AQ = torch.linalg.eigh(outputs)
+#     _, BQ = torch.linalg.eigh(targets)
+#     A = AQ[:,:,-rank:]
+#     B = BQ[:,:,-rank:]
+#     U, _, V = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+#     C = A @ U - B @ V
+#     return torch.linalg.matrix_norm(C,'fro')
+
+# subspace representation learning | Spectral distance (or chordal 2-norm distance) using principal angles
+def SignalSpectralDistPA(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+    return 2 * torch.sin(theta[:,rank-1] / 2)
+
+# subspace representation learning | Spectral distance (or chordal 2-norm distance) using orthonormal bases
+# def SignalSpectralDistOB(outputs, targets, source_numbers, angles):
+#     rank = source_numbers[0] # assume consistent rank sampling is enabled
+#     _, AQ = torch.linalg.eigh(outputs)
+#     _, BQ = torch.linalg.eigh(targets)
+#     A = AQ[:,:,-rank:]
+#     B = BQ[:,:,-rank:]
+#     U, _, V = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+#     C = A @ U - B @ V
+#     return torch.linalg.matrix_norm(C,2)
+
 # subspace representation learning
 def AvgSubspaceDist(outputs, targets, source_numbers, angles):
-    rank = source_numbers[0]
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
     m = targets.size(-1) - rank
     _, AQ = torch.linalg.eigh(outputs)
     _, BQ = torch.linalg.eigh(targets)
@@ -79,7 +221,7 @@ def AvgSubspaceDist(outputs, targets, source_numbers, angles):
 
 # subspace representation learning
 def L2SubspaceDist(outputs, targets, source_numbers, angles):
-    rank = source_numbers[0]
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
     m = targets.size(-1) - rank
     _, AQ = torch.linalg.eigh(outputs)
     _, BQ = torch.linalg.eigh(targets)
@@ -125,6 +267,39 @@ def AffInvDist3(outputs, targets, source_numbers, angles): # delta is 1e-3
     A = torch.vmap(logm)(targets_inv_sqrt @ outputs @ targets_inv_sqrt)
     return torch.linalg.matrix_norm(A,'fro')
 
+# What if only phi_1 is minimized?
+def SignalPhi1(outputs, targets, source_numbers, angles):
+    rank = source_numbers[0] # assume consistent rank sampling is enabled
+    _, AQ = torch.linalg.eigh(outputs)
+    _, BQ = torch.linalg.eigh(targets)
+    A = AQ[:,:,-rank:]
+    B = BQ[:,:,-rank:]
+    _, S, _ = torch.linalg.svd(A.conj().transpose(-2,-1) @ B)
+    theta = torch.acos(-torch.nn.functional.threshold(-S,-1,-1))
+    return theta[:,0]
+
+def scale_invariant_targets(outputs, targets):
+    targets_ri = torch.cat((targets.real.unsqueeze(-1),targets.imag.unsqueeze(-1)),-1)
+    outputs_ri = torch.cat((outputs.real.unsqueeze(-1),outputs.imag.unsqueeze(-1)),-1)
+    alphas = torch.sum(targets_ri * outputs_ri, dim=[-3,-2,-1], keepdim=True) / torch.sum(targets_ri * targets_ri, dim=[-3,-2,-1], keepdim=True) # this is a real number
+    return alphas.squeeze(-1) * targets
+
+def SignalSubspaceTargets(A, source_numbers):
+    rank = source_numbers[0]
+    _,Q = torch.linalg.eigh(A)
+    return Q[:,:,-rank:] @ Q[:,:,-rank:].transpose(-2,-1).conj()
+
+# ICASSP SI-Cov
+def SISDRFrobeniusNorm(outputs, targets, source_numbers, angles):
+    targets = scale_invariant_targets(outputs, targets)
+    return - 10 * torch.log10(torch.linalg.matrix_norm(targets,'fro') / FrobeniusNorm(outputs, targets, source_numbers, None) )
+
+# ICASSP SI-Sig
+def SignalSISDRFrobeniusNorm(outputs, targets, source_numbers, angles):
+    targets = SignalSubspaceTargets(targets,source_numbers)
+    targets = scale_invariant_targets(outputs, targets)
+    return - 10 * torch.log10(torch.linalg.matrix_norm(targets,'fro') / FrobeniusNorm(outputs, targets, source_numbers, None) )
+
 loss_dict = {
     'AngleMSE': AngleMSE,
     'OrderedAngleMSE': OrderedAngleMSE,
@@ -137,7 +312,20 @@ loss_dict = {
     'AvgSubspaceDist': AvgSubspaceDist,
     'L2SubspaceDist': L2SubspaceDist,
     'AffInvDist': AffInvDist,
-    'AffInvDist3': AffInvDist3
+    'AffInvDist3': AffInvDist3,
+    'SignalChordalDistPA': SignalChordalDistPA,
+    'SignalChordalDistOB': SignalChordalDistOB,
+    'SignalProjectionDistPA': SignalProjectionDistPA,
+    'SignalProjectionDistOB': SignalProjectionDistOB,
+    'SignalFubiniStudyDistPA': SignalFubiniStudyDistPA,
+    'SignalFubiniStudyDistOB': SignalFubiniStudyDistOB,
+    'SignalProcrustesDistPA': SignalProcrustesDistPA,
+    'SignalSpectralDistPA': SignalSpectralDistPA,
+    'SignalSubspaceDistNoCrsDirect': SignalSubspaceDistNoCrsDirect,
+    'SignalSubspaceDistNoCrsGroup': SignalSubspaceDistNoCrsGroup,
+    'SignalPhi1': SignalPhi1,
+    'SISDRFrobeniusNorm': SISDRFrobeniusNorm,
+    'SignalSISDRFrobeniusNorm': SignalSISDRFrobeniusNorm
 }
 
 def is_EnEnH(loss):

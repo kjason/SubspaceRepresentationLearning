@@ -285,7 +285,7 @@ class CovMapDataset(Dataset):
                             for j in range(self.L):
                                 if self.random_power is True:
                                     p = (power_range[1] - power_range[0]) * torch.rand(self.base_L,num_sources[k]) + power_range[0]
-                                    p = p / torch.max(p,dim=1)[0].unsqueeze(1)
+                                    p = p * p.size(1) / torch.sum(p,dim=1,keepdim=True)
                                 else:
                                     p = torch.ones(self.base_L,num_sources[k])
                                 if snr_uniform is True:
@@ -336,7 +336,7 @@ class CovMapDataset(Dataset):
             self.angles[:source_number] = source_angles
             if self.random_power is True:
                 p = (self.power_range[1] - self.power_range[0]) * torch.rand(1,source_number) + self.power_range[0]
-                p = p / torch.max(p,dim=1)[0].unsqueeze(1)
+                p = p * p.size(1) / torch.sum(p,dim=1,keepdim=True)
             else:
                 p = torch.ones(1,source_number)
             source_base = torch.randn(1,source_angles.shape[1],self.T_snapshots,dtype=torch.cfloat) # random source base
@@ -378,6 +378,7 @@ class Cov2DoADataset(Dataset):
                  mix_rho: bool,
                  provide_noise_var: bool = False,
                  random_power: bool = False,
+                 power_range: List[float] = [0.1,1.0],
                  total_power_one: bool = False,
                  evenly_distributed: bool = False,
                  return_snapshots: bool = False,
@@ -397,6 +398,7 @@ class Cov2DoADataset(Dataset):
         self.L = L
         self.base_L = base_L
         self.random_power = random_power
+        self.power_range = power_range
         self.evenly_distributed = evenly_distributed
         if evenly_distributed is True:
             if self.L != 1:
@@ -447,7 +449,8 @@ class Cov2DoADataset(Dataset):
                             src_angle = torch.from_numpy(source_angles[j,:])
                         repeat_src_angles = src_angle.unsqueeze(0).repeat(self.base_L,1)
                         if self.random_power is True:
-                            p = torch.rand(self.base_L,num_sources)
+                            p = (self.power_range[1] - self.power_range[0]) * torch.rand(self.base_L,num_sources) + self.power_range[0]
+                            p = p * p.size(1) / torch.sum(p,dim=1,keepdim=True)
                         else:
                             p = torch.ones(self.base_L,num_sources)
                         SNR = torch.rand(self.base_L,1,1) * (snr_range[1]-snr_range[0]) + snr_range[0]
@@ -502,6 +505,7 @@ if __name__ == '__main__':
     dynamic = False
     provide_noise_var = True
     random_power = False
+    power_range = [0.1,1.0]
     return_snapshots = True
     normalization = 'disabled'
     mode = 'testdryrun'
@@ -512,8 +516,9 @@ if __name__ == '__main__':
     mc_mag_angle = [0.1,0.1]
     rho = 0
     mix_rho = False
+    save_dataset = False
     
-    DoA_dataset = Cov2DoADataset(mode,d,lam,N_sensors,T_snapshots,num_sources,snr_range,seed,deg_range,min_sep,L,base_L,gain_bias,phase_bias_deg,position_bias,mc_mag_angle,rho,mix_rho,provide_noise_var,random_power,return_snapshots,device='cpu',save_dataset=True)
+    DoA_dataset = Cov2DoADataset(mode,d,lam,N_sensors,T_snapshots,num_sources,snr_range,seed,deg_range,min_sep,L,base_L,gain_bias,phase_bias_deg,position_bias,mc_mag_angle,rho,mix_rho,provide_noise_var,random_power,power_range,return_snapshots,device='cpu',save_dataset=save_dataset)
     dataloader = DataLoader(DoA_dataset,batch_size=512,shuffle=True,num_workers=0,pin_memory=True,drop_last=False)
 
     print(dataloader)
@@ -524,6 +529,7 @@ if __name__ == '__main__':
     for idx, (data,noise_var,label) in enumerate(dataloader):
         print(idx)
         print(data.shape)
+        print(data[0,:,:])
         print(noise_var)
         print(noise_var.shape)
         print(label.shape)

@@ -1,8 +1,9 @@
 # Subspace Representation Learning for Sparse Linear Arrays to Localize More Sources than Sensors: A Deep Learning Methodology
 
-This repository is the official implementation of the paper submitted to the IEEE Transactions on Signal Processing, [Subspace Representation Learning for Sparse Linear Arrays to Localize More Sources than Sensors: A Deep Learning Methodology](https://arxiv.org/abs/2408.16605).
+This repository is the official implementation of the paper accepted by IEEE Transactions on Signal Processing, [Subspace Representation Learning for Sparse Linear Arrays to Localize More Sources than Sensors: A Deep Learning Methodology](https://ieeexplore.ieee.org/document/10899405). This repository also hosts the official implementation of the paper accepted at ICASSP 2025, [A Comparative Study of Invariance-Aware Loss Functions for Deep Learning-based Gridless Direction-of-Arrival Estimation](https://ieeexplore.ieee.org/document/10889620).
 
-- Download the paper from [arXiv](https://arxiv.org/abs/2408.16605).
+- Download the paper of Subspace Representation Learning from [IEEE Xplore](https://ieeexplore.ieee.org/document/10899405) or [arXiv](https://arxiv.org/abs/2408.16605).
+- Download the paper of Invariance-Aware Loss Functions from [IEEE Xplore](https://ieeexplore.ieee.org/document/10889620) or [arXiv](https://www.arxiv.org/abs/2503.12386).
 
 ## Requirements
 
@@ -78,15 +79,32 @@ python3 performance.py --results_folder dnn_results --cov_models $DCRT $DCRGF $D
 
 To evaluate methods on other MRAs, simply switch the script to other cases as indicated in the folder `eval`.
 
+## Additional numerical results
+
+Additional numerical results for the 5-element MRA (see Section V(g) of the ICASSP paper) are available in the PDF file [`Appendix_Invariance_Aware_Loss_Functions_results_for_5-element_MRA.pdf`](Appendix_Invariance_Aware_Loss_Functions_results_for_5-element_MRA.pdf).
+
 ## BibTeX
 
-Please feel free to cite our paper if you find this repository useful in your work.
+If this repository contributes to your research, please cite our papers.
 
 ```
-@article{chen2024subspace,
+@article{chen2025subspace,
   title={Subspace Representation Learning for Sparse Linear Arrays to Localize More Sources than Sensors: A Deep Learning Methodology},
   author={Chen, Kuan-Lin and Rao, Bhaskar D.},
-  journal={arXiv preprint arXiv:2408.16605},
-  year={2024}
+  journal={IEEE Transactions on Signal Processing},
+  volume={73},
+  pages={1293-1308},
+  year={2025},
+  doi={10.1109/TSP.2025.3544170}
+}
+```
+
+```
+@inproceedings{chen2025comparative,
+  title={A Comparative Study of Invariance-Aware Loss Functions for Deep Learning-based Gridless Direction-of-Arrival Estimation},
+  author={Chen, Kuan-Lin and Rao, Bhaskar D.},
+  booktitle={International Conference on Acoustics, Speech and Signal Processing},
+  year={2025},
+  organization={IEEE}
 }
 ```

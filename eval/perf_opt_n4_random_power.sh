@@ -1,0 +1,2 @@
+#!/bin/bash
+python3 performance.py --random_power 1 --provide_noise_var 0 --N_sensors 4 --SPA 1 --num_random_thetas 100 --trials_per_theta 100 --num_sources_list 1 2 3 4 5 6 --rho 0 --results_folder results --min_sep 4 4 4 4 4 4 --gain_bias 0.0 0.2 0.2 0.2 -0.2 -0.2 -0.2 --phase_bias_deg 0 -30 -30 -30 30 30 30 --position_bias 0.0 -0.2 -0.2 -0.2 0.2 0.2 0.2
